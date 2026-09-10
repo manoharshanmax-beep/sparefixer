@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SpareFixer — Fast fixes, right parts.</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js" defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
@@ -360,6 +361,181 @@
   .divicon-marker svg{ transform:rotate(45deg); width:14px; height:14px; }
   .divicon-marker.mechanic{ background:var(--orange); }
   .divicon-marker.parts_counter{ background:var(--blue); }
+
+  /* =====================================================================
+     PRODUCTS APP — full-screen, in-page, Amazon-style spares checkout.
+     Opens inside the central frame (a fixed overlay covering the
+     viewport within the same tab) when "Products" is clicked in nav.
+  ===================================================================== */
+  #papp-overlay{ position:fixed; inset:0; z-index:900; background:var(--paper); display:none; flex-direction:column; }
+  #papp-overlay.show{ display:flex; }
+  #papp-overlay *{ box-sizing:border-box; }
+
+  .papp-topbar{ background:var(--charcoal-2); color:var(--paper-2); border-bottom:3px solid var(--orange); display:flex; align-items:center; gap:16px; padding:14px 24px; flex-shrink:0; flex-wrap:wrap; }
+  .papp-brand{ display:flex; align-items:center; gap:8px; font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px; flex-shrink:0; }
+  .papp-brand span{ color:var(--orange); }
+  .papp-brand small{ display:block; font-family:'Inter',sans-serif; font-weight:500; font-size:10.5px; color:var(--smoke); letter-spacing:.04em; text-transform:uppercase; }
+
+  .papp-steps{ display:flex; align-items:center; gap:6px; flex:1; min-width:180px; overflow-x:auto; padding:2px 0; }
+  .papp-step-dot{ display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:#6b7581; white-space:nowrap; }
+  .papp-step-dot .n{ width:22px; height:22px; border-radius:50%; border:1.5px solid var(--steel-2); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; flex-shrink:0; transition:all .2s ease; }
+  .papp-step-dot.active{ color:var(--paper-2); }
+  .papp-step-dot.active .n{ background:var(--orange); border-color:var(--orange); color:#1b1200; }
+  .papp-step-dot.done .n{ background:rgba(255,107,53,0.16); border-color:var(--orange); color:var(--orange); }
+  .papp-step-sep{ width:14px; height:1px; background:var(--steel-2); flex-shrink:0; }
+  @media(max-width:820px){ .papp-step-dot span.lbl{ display:none; } }
+
+  .papp-cart-btn{ position:relative; display:flex; align-items:center; gap:8px; background:var(--charcoal-3); border:1px solid var(--line); color:var(--paper-2); padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; transition:border-color .18s ease, color .18s ease; flex-shrink:0; }
+  .papp-cart-btn:hover{ border-color:var(--orange); color:var(--orange); }
+  .papp-cart-btn svg{ width:17px; height:17px; }
+  .papp-cart-badge{ position:absolute; top:-7px; right:-7px; background:var(--orange); color:#1b1200; font-size:10.5px; font-weight:700; min-width:18px; height:18px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0 4px; font-family:var(--mono); }
+  .papp-close-btn{ background:none; border:1px solid var(--line); color:#c7cdd3; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:border-color .18s ease, color .18s ease; }
+  .papp-close-btn:hover{ border-color:var(--orange); color:var(--orange); }
+
+  .papp-body{ flex:1; overflow-y:auto; background:var(--paper); }
+  .papp-inner{ max-width:1180px; margin:0 auto; padding:36px 32px 80px; }
+  @media(max-width:640px){ .papp-inner{ padding:24px 16px 64px; } }
+
+  .papp-head{ margin-bottom:28px; }
+  .papp-head h1{ font-family:'Space Grotesk', sans-serif; font-size:clamp(22px,3vw,29px); font-weight:700; margin-bottom:6px; }
+  .papp-head p{ color:#5b6470; font-size:14px; max-width:56ch; }
+
+  /* type / brand / model cards */
+  .papp-card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:16px; margin-bottom:8px; }
+  .papp-type-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:560px; margin-bottom:36px; }
+  @media(max-width:520px){ .papp-type-grid{ grid-template-columns:1fr; } }
+  .papp-type-card{ background:var(--paper-2); border:2px solid var(--line-light); padding:28px 20px; text-align:center; cursor:pointer; transition:all .2s ease; }
+  .papp-type-card:hover{ border-color:var(--orange); transform:translateY(-3px); }
+  .papp-type-card.selected{ border-color:var(--orange); background:rgba(255,107,53,0.06); box-shadow:0 0 0 1px var(--orange); }
+  .papp-type-card svg{ width:46px; height:46px; margin:0 auto 14px; color:var(--charcoal); transition:color .2s ease; }
+  .papp-type-card.selected svg{ color:var(--orange); }
+  .papp-type-card h3{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; margin-bottom:4px; }
+  .papp-type-card p{ font-size:12.5px; color:#7d8590; }
+
+  .papp-section-label{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#7d8590; margin-bottom:14px; }
+  .papp-brand-card{ background:var(--paper-2); border:1.5px solid var(--line-light); border-left:3px solid var(--blue); padding:18px 16px; cursor:pointer; transition:all .18s ease; display:flex; flex-direction:column; gap:6px; }
+  .papp-brand-card:hover{ transform:translateY(-3px); box-shadow:0 10px 20px rgba(20,23,26,0.1); }
+  .papp-brand-card.selected{ border-left-color:var(--orange); box-shadow:0 0 0 2px var(--orange); }
+  .papp-brand-card .bname{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15.5px; }
+  .papp-brand-card .bcount{ font-size:11.5px; color:#8b939c; }
+
+  .papp-err{ color:var(--orange-dim); font-size:13px; font-weight:600; margin-top:14px; display:none; }
+  .papp-err.show{ display:block; animation:flashBg .8s ease; }
+
+  .papp-btn-row{ display:flex; gap:10px; margin-top:30px; flex-wrap:wrap; }
+  .papp-btn{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14.5px; padding:13px 24px; cursor:pointer; border:none; transition:background .15s ease, transform .1s ease, color .15s ease, border-color .15s ease; }
+  .papp-btn:active{ transform:scale(.98); }
+  .papp-btn-primary{ background:var(--orange); color:#1b1200; }
+  .papp-btn-primary:hover{ background:#ff7d4d; }
+  .papp-btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
+  .papp-btn-ghost{ background:transparent; border:1.5px solid var(--line-light); color:var(--ink); }
+  .papp-btn-ghost:hover{ border-color:var(--steel); }
+  .papp-btn-outline{ background:transparent; border:1.5px solid var(--orange); color:var(--orange-dim); }
+  .papp-btn-outline:hover{ background:rgba(255,107,53,0.1); }
+
+  /* model search + list */
+  .papp-search{ display:flex; align-items:center; gap:8px; background:var(--paper-2); border:1px solid var(--line-light); padding:10px 16px; margin-bottom:22px; max-width:420px; }
+  .papp-search svg{ width:16px; height:16px; color:#8b939c; flex-shrink:0; }
+  .papp-search input{ border:none; outline:none; background:transparent; font-family:'Inter'; font-size:14px; width:100%; }
+  .papp-model-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:14px; }
+  .papp-model-card{ background:var(--paper-2); border:1.5px solid var(--line-light); padding:18px; cursor:pointer; transition:all .18s ease; }
+  .papp-model-card:hover{ transform:translateY(-3px); box-shadow:0 10px 20px rgba(20,23,26,0.1); }
+  .papp-model-card.selected{ border-color:var(--orange); box-shadow:0 0 0 2px var(--orange); }
+  .papp-model-card h4{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15.5px; }
+  .papp-model-card span{ font-size:12px; color:#8b939c; }
+  .papp-empty{ padding:30px; text-align:center; color:#8b939c; font-size:13.5px; border:1px dashed var(--line-light); }
+
+  /* product catalog */
+  .papp-cat-head{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .papp-prod-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:18px; }
+  .papp-prod-card{ background:var(--paper-2); border:1px solid var(--line-light); display:flex; flex-direction:column; transition:transform .2s ease, box-shadow .2s ease; }
+  .papp-prod-card:hover{ transform:translateY(-4px); box-shadow:0 12px 24px rgba(20,23,26,0.1); }
+  .papp-prod-img{ height:120px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#f3f4f6,#e8eaed); border-bottom:1px solid var(--line-light); }
+  .papp-prod-img svg{ width:52px; height:52px; color:var(--blue-dim); }
+  .papp-prod-body{ padding:14px 15px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .papp-prod-title{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14.5px; line-height:1.3; }
+  .papp-prod-oem{ font-family:var(--mono); font-size:11px; color:#8b939c; }
+  .papp-prod-rating{ display:flex; align-items:center; gap:5px; font-size:12px; color:#5b6470; }
+  .papp-prod-rating .stars{ color:var(--orange); letter-spacing:1px; font-size:12px; }
+  .papp-prod-price{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; color:var(--ink); margin-top:2px; }
+  .papp-prod-price sup{ font-size:11px; color:#8b939c; font-weight:500; }
+  .papp-add-btn{ margin-top:8px; width:100%; background:var(--charcoal-2); color:var(--paper-2); border:none; padding:10px; font-weight:700; font-size:13px; cursor:pointer; transition:background .18s ease; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .papp-add-btn:hover{ background:var(--orange); color:#1b1200; }
+  .papp-add-btn.in-cart{ background:rgba(59,125,216,0.12); color:var(--blue-dim); }
+
+  /* cart */
+  .papp-cart-list{ display:flex; flex-direction:column; gap:12px; margin-bottom:26px; }
+  .papp-cart-row{ display:flex; align-items:center; gap:16px; background:var(--paper-2); border:1px solid var(--line-light); border-left:3px solid var(--blue); padding:14px 16px; flex-wrap:wrap; }
+  .papp-cart-img{ width:52px; height:52px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#eef0f2; }
+  .papp-cart-img svg{ width:28px; height:28px; color:var(--blue-dim); }
+  .papp-cart-info{ flex:1; min-width:160px; }
+  .papp-cart-info .t{ font-weight:700; font-size:14px; }
+  .papp-cart-info .o{ font-family:var(--mono); font-size:11px; color:#8b939c; margin-top:2px; }
+  .papp-qty{ display:flex; align-items:center; gap:0; border:1px solid var(--line-light); }
+  .papp-qty button{ width:30px; height:30px; background:var(--paper); border:none; cursor:pointer; font-size:16px; font-weight:700; color:var(--ink); transition:background .15s ease; }
+  .papp-qty button:hover{ background:#e8eaed; }
+  .papp-qty .q{ width:36px; text-align:center; font-family:var(--mono); font-weight:600; font-size:13.5px; }
+  .papp-cart-sub{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15.5px; min-width:90px; text-align:right; }
+  .papp-cart-remove{ background:none; border:none; color:#8b939c; cursor:pointer; padding:4px; transition:color .15s ease; }
+  .papp-cart-remove:hover{ color:var(--orange-dim); }
+  .papp-cart-remove svg{ width:17px; height:17px; }
+
+  .papp-coupon-row{ display:flex; gap:10px; max-width:380px; margin-bottom:26px; flex-wrap:wrap; }
+  .papp-coupon-row input{ flex:1; min-width:180px; background:var(--paper-2); border:1px solid var(--line-light); padding:11px 14px; font-family:var(--mono); font-size:13.5px; text-transform:uppercase; }
+  .papp-coupon-row input:focus{ outline:none; border-color:var(--orange); }
+  .papp-coupon-msg{ font-size:12.5px; margin-top:8px; font-weight:600; }
+  .papp-coupon-msg.ok{ color:#2a7a4f; }
+  .papp-coupon-msg.bad{ color:var(--orange-dim); }
+
+  .papp-summary{ background:var(--paper-2); border:1px solid var(--line-light); max-width:380px; margin-left:auto; }
+  .papp-summary-row{ display:flex; justify-content:space-between; padding:12px 18px; font-size:13.5px; color:#5b6470; border-bottom:1px solid var(--line-light); }
+  .papp-summary-row b{ color:var(--ink); font-weight:600; }
+  .papp-summary-row.discount b{ color:#2a7a4f; }
+  .papp-summary-row.total{ background:var(--charcoal-2); color:#fff; font-size:16px; padding:16px 18px; }
+  .papp-summary-row.total b{ color:#fff; font-family:'Space Grotesk',sans-serif; font-size:19px; }
+  @media(max-width:640px){ .papp-summary{ margin-left:0; max-width:none; } }
+
+  /* checkout form */
+  .papp-form{ max-width:520px; }
+  .papp-field{ margin-bottom:18px; }
+  .papp-field label{ display:block; font-size:12.5px; font-weight:600; color:#5b6470; margin-bottom:6px; }
+  .papp-field input, .papp-field select, .papp-field textarea{ width:100%; background:var(--paper-2); border:1px solid var(--line-light); font-family:'Inter'; font-size:14px; padding:12px 14px; transition:border-color .18s ease, box-shadow .18s ease; }
+  .papp-field textarea{ resize:vertical; min-height:74px; }
+  .papp-field input:focus, .papp-field select:focus, .papp-field textarea:focus{ outline:none; border-color:var(--orange); box-shadow:0 0 0 3px rgba(255,107,53,0.14); }
+  .papp-pay-methods{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media(max-width:460px){ .papp-pay-methods{ grid-template-columns:1fr; } }
+  .papp-pay-opt{ display:flex; align-items:center; gap:9px; border:1.5px solid var(--line-light); padding:11px 13px; cursor:pointer; font-size:13.5px; font-weight:600; transition:border-color .15s ease; }
+  .papp-pay-opt:hover{ border-color:var(--steel); }
+  .papp-pay-opt.selected{ border-color:var(--orange); background:rgba(255,107,53,0.06); }
+  .papp-pay-opt input{ accent-color:var(--orange); width:auto; }
+
+  /* OTP modal */
+  #papp-otp-overlay{ position:fixed; inset:0; z-index:1000; background:rgba(11,13,15,0.94); display:none; align-items:center; justify-content:center; padding:20px; }
+  #papp-otp-overlay.show{ display:flex; }
+  .papp-otp-box{ background:var(--charcoal-2); border:1px solid var(--line); border-top:4px solid var(--orange); color:var(--paper-2); padding:34px 30px; max-width:380px; width:100%; text-align:center; }
+  .papp-otp-box h3{ font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; margin-bottom:6px; }
+  .papp-otp-box p{ font-size:13px; color:var(--smoke); margin-bottom:22px; }
+  .papp-otp-digits{ display:flex; gap:10px; justify-content:center; margin-bottom:16px; }
+  .papp-otp-digits input{ width:48px; height:56px; text-align:center; font-size:22px; font-family:var(--mono); font-weight:700; background:var(--charcoal-3); border:1.5px solid var(--line); color:#fff; transition:border-color .15s ease; }
+  .papp-otp-digits input:focus{ outline:none; border-color:var(--orange); }
+  .papp-otp-timer{ font-family:var(--mono); font-size:13px; color:var(--orange); margin-bottom:14px; }
+  .papp-otp-spinner{ width:34px; height:34px; margin:6px auto 0; border-radius:50%; border:3px solid rgba(255,107,53,0.2); border-top-color:var(--orange); animation:spin .8s linear infinite; display:none; }
+  .papp-otp-spinner.show{ display:block; }
+  .papp-otp-error{ color:#ff8a65; font-size:12.5px; margin-top:10px; min-height:16px; }
+  .papp-otp-hint{ font-family:var(--mono); font-size:11px; color:#6b7581; margin-top:16px; }
+
+  /* success */
+  .papp-success{ text-align:center; padding:50px 20px; position:relative; max-width:560px; margin:0 auto; }
+  .papp-check{ width:78px; height:78px; border-radius:50%; background:rgba(255,107,53,0.12); display:flex; align-items:center; justify-content:center; margin:0 auto 22px; animation:popIn .4s ease; }
+  .papp-check svg{ width:38px; height:38px; }
+  .papp-success h2{ font-family:'Space Grotesk',sans-serif; font-size:25px; font-weight:700; margin-bottom:10px; }
+  .papp-success .oid{ font-family:var(--mono); font-size:14px; color:#5b6470; margin-bottom:26px; }
+  .papp-success .oid b{ color:var(--orange-dim); }
+  .papp-track{ background:var(--paper-2); border:1px solid var(--line-light); text-align:left; margin-bottom:28px; }
+  .papp-track-row{ display:flex; justify-content:space-between; padding:12px 18px; font-size:13.5px; border-bottom:1px solid var(--line-light); color:#5b6470; }
+  .papp-track-row:last-child{ border-bottom:none; }
+  .papp-track-row b{ color:var(--ink); font-weight:600; text-align:right; }
+  #papp-confetti-canvas{ position:fixed; inset:0; pointer-events:none; z-index:1100; }
 </style>
 </head>
 <body>
@@ -380,7 +556,7 @@
         <a href="#compare" data-section="compare">Compare prices</a>
         <a href="#shops" data-section="shops">Shops &amp; map</a>
         <a href="#features" data-section="features">How it works</a>
-        <a href="javascript:void(0)" id="productsNavLink" title="Opens in a new tab">Products <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style="display:inline;vertical-align:middle;margin-left:2px;margin-bottom:2px"><path d="M7 17L17 7M17 7H9M17 7V15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <a href="javascript:void(0)" id="productsNavLink" title="Browse spare parts">Products <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="display:inline;vertical-align:middle;margin-left:2px;margin-bottom:2px"><path d="M6 6h15l-1.5 9h-12z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20" r="1.4" fill="currentColor"/><circle cx="17" cy="20" r="1.4" fill="currentColor"/><path d="M3 3h2l1 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
         <span id="navIndicator"></span>
       </nav>
       <button class="nav-scan-btn" id="navScanBtn" type="button">
@@ -628,6 +804,42 @@
   <button id="backToTop" aria-label="Back to top">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="#1b1200" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
+
+  <!-- ================= PRODUCTS APP (full-screen, in-page) ================= -->
+  <div id="papp-overlay" aria-hidden="true">
+    <div class="papp-topbar">
+      <div class="papp-brand">Spare<span>Fixer</span><small>Products</small></div>
+      <div class="papp-steps" id="papp-steps"></div>
+      <button class="papp-cart-btn" id="papp-cart-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 4h2l2.2 11.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20.5" r="1.4" fill="currentColor"/><circle cx="17" cy="20.5" r="1.4" fill="currentColor"/></svg>
+        Cart<span class="papp-cart-badge" id="papp-cart-badge">0</span>
+      </button>
+      <button class="papp-close-btn" id="papp-close-btn" type="button" aria-label="Close products app">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="papp-body" id="papp-body"></div>
+  </div>
+
+  <!-- OTP verification modal -->
+  <div id="papp-otp-overlay">
+    <div class="papp-otp-box">
+      <h3>Verify your payment</h3>
+      <p id="papp-otp-sub">We've sent a 4-digit OTP to your registered mobile number.</p>
+      <div class="papp-otp-digits" id="papp-otp-digits">
+        <input type="text" inputmode="numeric" maxlength="1" class="papp-otp-input" data-i="0">
+        <input type="text" inputmode="numeric" maxlength="1" class="papp-otp-input" data-i="1">
+        <input type="text" inputmode="numeric" maxlength="1" class="papp-otp-input" data-i="2">
+        <input type="text" inputmode="numeric" maxlength="1" class="papp-otp-input" data-i="3">
+      </div>
+      <div class="papp-otp-timer" id="papp-otp-timer">Resend in 00:30</div>
+      <div class="papp-otp-spinner" id="papp-otp-spinner"></div>
+      <div class="papp-otp-error" id="papp-otp-error"></div>
+      <div class="papp-otp-hint">Demo mode — enter 1234 to auto-verify</div>
+    </div>
+  </div>
+
+  <canvas id="papp-confetti-canvas"></canvas>
 
   <!-- ================= VISUAL SCANNER MODAL ================= -->
   <div class="scanner-overlay" id="scannerOverlay">
@@ -1439,421 +1651,662 @@
 </script>
 <script>
 /* =====================================================================
-   PRODUCTS TAB — self-contained feature.
-   Clicking the "Products" nav link opens a brand-new browser tab
-   (via a Blob URL) containing its own complete HTML/CSS/JS document:
-   two dropdown categories (Car / Bike Parts & Accessories), a product
-   detail view, pickup vs. home-delivery flows, an 8s animated loading
-   overlay, and a confetti + checkmark order-confirmation screen.
-   Everything below lives in this one <script> tag.
+   PRODUCTS APP — full-screen, in-page, Amazon-style spares checkout.
+   Clicking the "Products" nav link opens this application inside the
+   central frame of the current page (a fixed full-viewport overlay),
+   never a new tab/window. Seven steps: vehicle type & brand, model,
+   catalog, cart & discount, checkout form, OTP verification, and an
+   order-success screen with a confetti celebration.
 ===================================================================== */
 (function(){
   "use strict";
 
-  var link = document.getElementById("productsNavLink");
-  if (!link) return;
-
-  link.addEventListener("click", function(e){
-    e.preventDefault();
-    var html = buildProductsAppHTML();
-    var blob = new Blob([html], { type: "text/html" });
-    var url = URL.createObjectURL(blob);
-    var win = window.open(url, "_blank");
-    if (!win) {
-      window.location.href = url; // popup blocked — fall back to same-tab nav
+  /* ---------------- catalog data ---------------- */
+  var CATALOG = {
+    car: {
+      label: "Car",
+      icon: "car",
+      brands: {
+        hyundai:  { label: "Hyundai",        models: ["Creta", "i20", "Venue"] },
+        maruti:   { label: "Maruti Suzuki",  models: ["Swift", "Baleno", "WagonR"] },
+        honda:    { label: "Honda",          models: ["City", "Amaze", "Elevate"] },
+        tata:     { label: "Tata",           models: ["Nexon", "Punch", "Altroz"] }
+      }
+    },
+    bike: {
+      label: "Bike",
+      icon: "bike",
+      brands: {
+        honda:        { label: "Honda",          models: ["Activa 6G", "Shine", "Unicorn"] },
+        bajaj:        { label: "Bajaj",          models: ["Pulsar 150", "Platina", "Avenger"] },
+        royalenfield: { label: "Royal Enfield",  models: ["Classic 350", "Hunter 350", "Meteor 350"] },
+        tvs:          { label: "TVS",            models: ["Apache RTR", "Jupiter", "Raider"] }
+      }
     }
-  });
+  };
 
-  function buildProductsAppHTML(){
-    var css = [
-      "@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');",
-      "*{box-sizing:border-box;margin:0;padding:0;}",
-      ":root{--bg:#0f1215;--panel:#1c2126;--panel-2:#262c32;--line:#3a4148;--orange:#ff6b35;--orange-dim:#d4501f;--orange-glow:rgba(255,107,53,0.35);--ink:#eef0f2;--smoke:#9aa2ab;--mono:'JetBrains Mono',monospace;}",
-      "html,body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;min-height:100%;}",
-      "a{color:inherit;}",
-      "button{font-family:inherit;}",
-      ".wrap{max-width:880px;margin:0 auto;padding:0 24px 80px;}",
-      "header.top{background:#0b0d0f;border-bottom:3px solid var(--orange);padding:20px 0;position:sticky;top:0;z-index:50;}",
-      "header.top .wrap{padding-bottom:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}",
-      ".brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;}",
-      ".brand span{color:var(--orange);}",
-      ".brand small{display:block;font-family:'Inter',sans-serif;font-weight:500;font-size:11.5px;color:var(--smoke);letter-spacing:.04em;text-transform:uppercase;margin-top:2px;}",
-      ".tab-note{font-size:12px;color:var(--smoke);}",
-      ".hero-copy{padding:34px 0 22px;}",
-      ".hero-copy h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(24px,3.6vw,32px);font-weight:700;}",
-      ".hero-copy h1 span{color:var(--orange);}",
-      ".hero-copy p{color:var(--smoke);font-size:14px;margin-top:8px;max-width:56ch;}",
-      ".dd-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;}",
-      "@media(max-width:620px){.dd-row{grid-template-columns:1fr;}}",
-      ".dd{position:relative;}",
-      ".dd-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--orange);color:var(--ink);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;padding:16px 18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}",
-      ".dd-btn:hover{background:var(--panel-2);}",
-      ".dd.open .dd-btn{background:var(--panel-2);border-color:var(--orange);}",
-      ".dd-caret{transition:transform .2s ease;color:var(--orange);font-size:13px;}",
-      ".dd.open .dd-caret{transform:rotate(180deg);}",
-      ".dd-panel{display:none;background:var(--panel);border:1px solid var(--line);border-top:none;padding:14px 16px 6px;position:relative;z-index:10;}",
-      ".dd.open .dd-panel{display:block;animation:fadeDown .22s ease;}",
-      "@keyframes fadeDown{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}",
-      ".dd-group{margin-bottom:14px;}",
-      ".dd-group h4{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--smoke);margin-bottom:8px;font-weight:600;}",
-      ".dd-items{display:grid;grid-template-columns:1fr 1fr;gap:6px;}",
-      "@media(max-width:480px){.dd-items{grid-template-columns:1fr;}}",
-      ".dd-item{display:flex;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);color:var(--ink);font-size:13px;padding:9px 11px;cursor:pointer;text-align:left;transition:border-color .15s ease,color .15s ease;}",
-      ".dd-item:hover{border-color:var(--orange);color:var(--orange);}",
-      ".dd-item b{font-family:var(--mono);font-weight:600;color:var(--orange-dim);white-space:nowrap;}",
-      ".dd-item:hover b{color:var(--orange);}",
-      "#appArea{margin-top:28px;}",
-      ".hint-card{border:1px dashed var(--line);padding:30px;text-align:center;color:var(--smoke);font-size:13.5px;}",
-      ".card{background:var(--panel);border:1px solid var(--line);padding:26px;}",
-      ".back-link{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--smoke);font-size:12.5px;cursor:pointer;margin-bottom:16px;padding:0;transition:color .15s ease;}",
-      ".back-link:hover{color:var(--orange);}",
-      ".detail-top{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}",
-      ".detail-icon{width:104px;height:104px;flex-shrink:0;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--orange);}",
-      ".detail-icon svg{width:48px;height:48px;}",
-      ".detail-info{flex:1;min-width:220px;}",
-      ".detail-info .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,107,53,0.14);color:var(--orange);padding:3px 9px;margin-bottom:8px;}",
-      ".detail-info h2{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:6px;}",
-      ".detail-price{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:var(--orange);}",
-      ".oem-line{font-family:var(--mono);font-size:12.5px;color:var(--smoke);margin-top:8px;}",
-      ".oem-line b{color:var(--ink);}",
-      ".spec-list{list-style:none;margin:18px 0 24px;display:flex;flex-direction:column;gap:8px;}",
-      ".spec-list li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;color:#dfe3e6;}",
-      ".spec-list li::before{content:'';width:6px;height:6px;background:var(--orange);flex-shrink:0;margin-top:6px;}",
-      ".fulfill-row{display:flex;gap:12px;flex-wrap:wrap;}",
-      ".btn{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;padding:14px 20px;cursor:pointer;border:none;transition:background .15s ease,transform .1s ease,color .15s ease;flex:1;min-width:200px;}",
-      ".btn:active{transform:scale(.98);}",
-      ".btn-fill{background:var(--orange);color:#1b1200;}",
-      ".btn-fill:hover{background:#ff7d4d;}",
-      ".btn-outline{background:transparent;border:1.5px solid var(--orange);color:var(--orange);}",
-      ".btn-outline:hover{background:rgba(255,107,53,0.12);}",
-      ".msg-banner{background:rgba(255,107,53,0.1);border:1px solid var(--orange);color:#ffd9c4;padding:16px 18px;font-size:14px;margin-bottom:20px;font-weight:500;}",
-      ".summary-mini{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;background:var(--panel-2);border:1px solid var(--line);padding:14px 16px;margin-bottom:22px;font-size:13px;color:#dfe3e6;}",
-      ".summary-mini b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--ink);}",
-      ".field{margin-bottom:16px;}",
-      ".field label{display:block;font-size:12px;color:#aeb5bc;margin-bottom:6px;font-weight:500;}",
-      ".field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);font-family:'Inter',sans-serif;font-size:14px;padding:11px 14px;transition:border-color .18s ease,box-shadow .18s ease;}",
-      ".field textarea{resize:vertical;min-height:64px;}",
-      ".field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,107,53,0.15);}",
-      ".loading-overlay{position:fixed;inset:0;background:rgba(11,13,15,0.96);display:none;align-items:center;justify-content:center;flex-direction:column;gap:22px;z-index:999;}",
-      ".loading-overlay.show{display:flex;}",
-      ".spinner-wheel{width:64px;height:64px;border-radius:50%;border:5px solid rgba(255,107,53,0.18);border-top-color:var(--orange);animation:spin .85s linear infinite;}",
-      "@keyframes spin{to{transform:rotate(360deg);}}",
-      "#loadingStatus{font-family:var(--mono);font-size:13.5px;color:#dfe3e6;letter-spacing:.02em;min-height:18px;transition:opacity .2s ease;}",
-      ".loading-bar{width:220px;height:4px;background:var(--panel-2);overflow:hidden;position:relative;}",
-      ".loading-bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--orange-dim),var(--orange));animation:barFill 8s linear forwards;transform-origin:left;}",
-      "@keyframes barFill{from{transform:scaleX(0);}to{transform:scaleX(1);}}",
-      "#confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:40;}",
-      ".confirm-wrap{text-align:center;padding:46px 26px;position:relative;}",
-      ".check-circle{width:96px;height:96px;border-radius:50%;background:rgba(255,107,53,0.14);border:3px solid var(--orange);display:flex;align-items:center;justify-content:center;margin:0 auto 22px;transform:scale(0);animation:checkPop .5s cubic-bezier(.34,1.56,.64,1) forwards;}",
-      "@keyframes checkPop{0%{transform:scale(0);}60%{transform:scale(1.15);}100%{transform:scale(1);}}",
-      ".check-circle svg{width:46px;height:46px;}",
-      ".check-circle path{stroke-dasharray:40;stroke-dashoffset:40;animation:checkDraw .45s ease .35s forwards;}",
-      "@keyframes checkDraw{to{stroke-dashoffset:0;}}",
-      ".confirm-wrap h2{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;margin-bottom:8px;}",
-      ".confirm-wrap p.sub{color:var(--smoke);font-size:14px;margin-bottom:26px;}",
-      ".order-summary{text-align:left;background:var(--panel-2);border:1px solid var(--line);padding:20px 22px;margin:0 auto 26px;max-width:420px;}",
-      ".order-summary div{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line);color:#dfe3e6;}",
-      ".order-summary div:last-child{border-bottom:none;}",
-      ".order-summary div b{color:var(--ink);}",
-      ".footnote{font-size:11.5px;color:var(--smoke);margin-top:26px;}"
-    ].join("\n");
+  var CAR_PARTS = [
+    ["Air Filter", "filter", 899],
+    ["Oil Filter", "filter", 349],
+    ["Cabin Filter", "filter", 599],
+    ["Front Brake Pads", "brake", 1899],
+    ["Rear Brake Pads", "brake", 1599],
+    ["Brake Disc Rotor", "brake", 2999],
+    ["Headlight Assembly", "light", 4499],
+    ["Tail Light Assembly", "light", 2199],
+    ["Spark Plug Set", "engine", 1299],
+    ["Timing Belt Kit", "engine", 3799],
+    ["Shock Absorber", "suspension", 3299],
+    ["12V Battery", "battery", 6499],
+    ["Wiper Blade Set", "accessory", 799],
+    ["Side Mirror (RH)", "accessory", 1899]
+  ];
 
-    var innerScript = buildInnerScript();
+  var BIKE_PARTS = [
+    ["Air Filter", "filter", 349],
+    ["Oil Filter", "filter", 199],
+    ["Chain Sprocket Kit", "engine", 1799],
+    ["Clutch Plate Set", "engine", 1299],
+    ["Front Brake Shoe", "brake", 449],
+    ["Rear Brake Shoe", "brake", 399],
+    ["Headlight Assembly", "light", 999],
+    ["Tail Light Assembly", "light", 599],
+    ["Spark Plug", "engine", 249],
+    ["12V Battery", "battery", 1899],
+    ["Rear View Mirror Set", "accessory", 449],
+    ["Seat Cover", "accessory", 699]
+  ];
 
-    return [
-      "<!DOCTYPE html>",
-      "<html lang=\"en\">",
-      "<head>",
-      "<meta charset=\"UTF-8\">",
-      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
-      "<title>SpareFixer Products — Car &amp; Bike Parts and Accessories</title>",
-      "<style>" + css + "</style>",
-      "</head>",
-      "<body>",
-      "<header class=\"top\"><div class=\"wrap\"><div class=\"brand\">Spare<span>Fixer</span><small>Products Catalog</small></div><div class=\"tab-note\">Opened in a new tab · you can close this anytime</div></div></header>",
-      "<div class=\"wrap\">",
-      "<div class=\"hero-copy\"><h1>Shop genuine <span>parts &amp; accessories</span></h1><p>Pick a category below, choose your item, then decide how you'd like it fulfilled — pick it up from a partner store or get it delivered home.</p></div>",
-      "<div class=\"dd-row\" id=\"ddRow\"></div>",
-      "<div id=\"appArea\"><div class=\"hint-card\">Choose a category above to browse products.</div></div>",
-      "</div>",
-      "<div class=\"loading-overlay\" id=\"loadingOverlay\"><div class=\"spinner-wheel\"></div><div id=\"loadingStatus\">Verifying inventory...</div><div class=\"loading-bar\" id=\"loadingBar\"></div></div>",
-      "<canvas id=\"confettiCanvas\"></canvas>",
-      "<script>" + innerScript + "<\/script>",
-      "</body>",
-      "</html>"
-    ].join("\n");
+  var PART_ICONS = {
+    filter: '<svg viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="16" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    brake: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    light: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 9a8 8 0 0 1 14-5l2 2-4 4H8L4 9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 12h9l3 3-3 3H9l-3-3" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+    engine: '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="9" width="12" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M16 11h2.5L20 13v2l-1.5 1H16" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 9V6h5v3M9 16v2M13 16v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    suspension: '<svg viewBox="0 0 24 24" fill="none"><path d="M9 3v4M9 19v2M9 7c0 1.6 2.4 1.6 2.4 3.2S9 12.8 9 14.4s2.4 1.6 2.4 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="19" r="2.4" stroke="currentColor" stroke-width="1.6"/></svg>',
+    battery: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="16" height="9" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M19 11h2v3h-2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8V6h3v2M13 8V6h3v2" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5h2M13 12.5h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    accessory: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.4 5 5.6.6-4.2 3.8 1.2 5.6L12 15l-5 3 1.2-5.6L4 8.6l5.6-.6L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
+  };
+
+  var TYPE_ICONS = {
+    car: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 16.5V12l2-4.5A2 2 0 0 1 7.8 6.2h8.4A2 2 0 0 1 18 7.5L20 12v4.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><rect x="3.2" y="12" width="17.6" height="6" rx="1.4" stroke="currentColor" stroke-width="1.6"/><circle cx="7.5" cy="18" r="1.8" stroke="currentColor" stroke-width="1.6"/><circle cx="16.5" cy="18" r="1.8" stroke="currentColor" stroke-width="1.6"/></svg>',
+    bike: '<svg viewBox="0 0 24 24" fill="none"><circle cx="5.5" cy="17.5" r="3.2" stroke="currentColor" stroke-width="1.6"/><circle cx="18.5" cy="17.5" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 17.5L10 9h4l-2 4h3.5l3 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+  };
+
+  var STEP_LABELS = ["Vehicle", "Model", "Catalog", "Cart", "Checkout", "Verify", "Done"];
+
+  /* ---------------- helpers ---------------- */
+  function fmtRupee(n){ return "\u20B9" + Math.round(n).toLocaleString("en-IN"); }
+  function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g, ""); }
+
+  function seededRand(seed){
+    var x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
   }
 
-  function buildInnerScript(){
-    return [
-      "(function(){",
-      "\"use strict\";",
-      "",
-      "function fmtRupee(n){ return \"\\u20B9\" + n.toLocaleString(\"en-IN\"); }",
-      "function hashStr(str){ var h = 0; for (var i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; } return h; }",
-      "function oemFor(veh, group, name){",
-      "  var code = veh === \"car\" ? \"CAR\" : \"2W\";",
-      "  var g = group.slice(0,3).toUpperCase();",
-      "  var h = hashStr(veh+group+name).toString(36).toUpperCase().slice(0,5);",
-      "  return \"SF-\" + code + \"-\" + g + \"-\" + h;",
-      "}",
-      "",
-      "var SPEC_BANK = {",
-      "  \"Engine Parts\": [\"OEM-grade alloy construction\",\"Direct-fit, no modification needed\",\"12-month warranty\"],",
-      "  \"Brakes\": [\"Ceramic composite compound\",\"ISI certified\",\"Heat-resistant to 400\\u00B0C\"],",
-      "  \"Electrical\": [\"12V compatible\",\"Weatherproof housing\",\"Plug-and-play harness\"],",
-      "  \"Accessories\": [\"Universal fit\",\"Premium finish\",\"Easy self-install\"]",
-      "};",
-      "",
-      "var VEHICLES = {",
-      "  car: { label:\"Car Parts & Accessories\", icon:\"car\", groups:[",
-      "    { name:\"Engine Parts\", items:[[\"Air Filter\",420],[\"Oil Filter\",380],[\"Timing Belt Kit\",1450],[\"Alternator\",6200],[\"Spark Plug Set\",650]] },",
-      "    { name:\"Brakes\", items:[[\"Front Brake Pad Set\",1240],[\"Rear Brake Pad Set\",980],[\"Brake Disc Rotor\",2350],[\"Brake Caliper\",3100]] },",
-      "    { name:\"Electrical\", items:[[\"Car Battery 12V\",5800],[\"Headlight Assembly\",3400],[\"Wiper Motor\",1650],[\"Horn Set\",320]] },",
-      "    { name:\"Accessories\", items:[[\"Car Phone Mount\",499],[\"Seat Cover Set\",1899],[\"Dash Camera\",2999],[\"Floor Mat Set\",1299],[\"Car Perfume Kit\",349]] }",
-      "  ]},",
-      "  bike: { label:\"Bike Parts & Accessories\", icon:\"bike\", groups:[",
-      "    { name:\"Engine Parts\", items:[[\"Piston Kit\",1650],[\"Carburetor Assembly\",2100],[\"Clutch Plate Set\",980],[\"Cam Chain\",650]] },",
-      "    { name:\"Brakes\", items:[[\"Front Brake Pad\",520],[\"Rear Brake Shoe\",380],[\"Brake Disc\",1450],[\"Brake Cable\",180]] },",
-      "    { name:\"Electrical\", items:[[\"Bike Battery 12V\",1850],[\"Headlamp Assembly\",1250],[\"CDI Unit\",920],[\"Ignition Coil\",650]] },",
-      "    { name:\"Accessories\", items:[[\"Riding Gloves\",799],[\"Full-Face Helmet\",2499],[\"Saddle Bag\",1199],[\"Phone Mount Clamp\",399],[\"Bike Cover\",899]] }",
-      "  ]}",
-      "};",
-      "",
-      "var ICONS = {",
-      "  car: '<svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"7.5\" cy=\"16.5\" r=\"1.4\" fill=\"currentColor\"/><circle cx=\"16.5\" cy=\"16.5\" r=\"1.4\" fill=\"currentColor\"/></svg>',",
-      "  bike: '<svg viewBox=\"0 0 24 24\" fill=\"none\"><circle cx=\"5.5\" cy=\"17.5\" r=\"3.2\" stroke=\"currentColor\" stroke-width=\"1.6\"/><circle cx=\"18.5\" cy=\"17.5\" r=\"3.2\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M5.5 17.5L10 9h4l-2 4h3.5l3 4.5\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M10 9h5\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"/></svg>'",
-      "};",
-      "",
-      "var STORES = [\"Anna Nagar Auto Spares\",\"Velachery Car Care\",\"Adyar Genuine Parts\",\"Mylapore Fast Fix\",\"Metro Auto Warehouse\"];",
-      "var STATUS_MESSAGES = [\"Verifying inventory...\",\"Checking nearby shop stock...\",\"Securing order with merchant...\",\"Confirming payment details...\",\"Finalizing your order...\"];",
-      "",
-      "var appArea = document.getElementById(\"appArea\");",
-      "var ddRow = document.getElementById(\"ddRow\");",
-      "var overlay = document.getElementById(\"loadingOverlay\");",
-      "var loadingStatusEl = document.getElementById(\"loadingStatus\");",
-      "var loadingBar = document.getElementById(\"loadingBar\");",
-      "var statusTimer = null, statusIdx = 0;",
-      "var confettiRAF = null;",
-      "var currentProduct = null;",
-      "",
-      "function renderDropdowns(){",
-      "  var html = \"\";",
-      "  Object.keys(VEHICLES).forEach(function(vehKey){",
-      "    var veh = VEHICLES[vehKey];",
-      "    html += '<div class=\"dd\" id=\"dd-' + vehKey + '\">';",
-      "    html += '<button class=\"dd-btn\" data-veh=\"' + vehKey + '\">' + veh.label + '<span class=\"dd-caret\">\\u25BE</span></button>';",
-      "    html += '<div class=\"dd-panel\">';",
-      "    veh.groups.forEach(function(group, gi){",
-      "      html += '<div class=\"dd-group\"><h4>' + group.name + '</h4><div class=\"dd-items\">';",
-      "      group.items.forEach(function(item, ii){",
-      "        html += '<button class=\"dd-item\" data-veh=\"' + vehKey + '\" data-gi=\"' + gi + '\" data-ii=\"' + ii + '\"><span>' + item[0] + '</span><b>' + fmtRupee(item[1]) + '</b></button>';",
-      "      });",
-      "      html += '</div></div>';",
-      "    });",
-      "    html += '</div></div>';",
-      "  });",
-      "  ddRow.innerHTML = html;",
-      "",
-      "  ddRow.querySelectorAll(\".dd-btn\").forEach(function(btn){",
-      "    btn.addEventListener(\"click\", function(){",
-      "      var parent = btn.closest(\".dd\");",
-      "      var wasOpen = parent.classList.contains(\"open\");",
-      "      ddRow.querySelectorAll(\".dd\").forEach(function(d){ d.classList.remove(\"open\"); });",
-      "      if (!wasOpen) parent.classList.add(\"open\");",
-      "    });",
-      "  });",
-      "  ddRow.querySelectorAll(\".dd-item\").forEach(function(item){",
-      "    item.addEventListener(\"click\", function(){",
-      "      var vehKey = item.getAttribute(\"data-veh\");",
-      "      var gi = parseInt(item.getAttribute(\"data-gi\"), 10);",
-      "      var ii = parseInt(item.getAttribute(\"data-ii\"), 10);",
-      "      selectProduct(vehKey, gi, ii);",
-      "      ddRow.querySelectorAll(\".dd\").forEach(function(d){ d.classList.remove(\"open\"); });",
-      "    });",
-      "  });",
-      "  document.addEventListener(\"click\", function(e){",
-      "    if (!e.target.closest(\".dd\")) ddRow.querySelectorAll(\".dd\").forEach(function(d){ d.classList.remove(\"open\"); });",
-      "  });",
-      "}",
-      "",
-      "function selectProduct(vehKey, gi, ii){",
-      "  var veh = VEHICLES[vehKey];",
-      "  var group = veh.groups[gi];",
-      "  var pair = group.items[ii];",
-      "  currentProduct = {",
-      "    vehKey: vehKey, vehLabel: veh.label, group: group.name, name: pair[0], price: pair[1],",
-      "    oem: oemFor(vehKey, group.name, pair[0]), specs: SPEC_BANK[group.name] || SPEC_BANK.Accessories, icon: ICONS[veh.icon]",
-      "  };",
-      "  renderDetail();",
-      "}",
-      "",
-      "function renderDetail(){",
-      "  var p = currentProduct;",
-      "  var html = '';",
-      "  html += '<button class=\"back-link\" id=\"backToBrowse\">\\u2190 Back to browsing</button>';",
-      "  html += '<div class=\"card\">';",
-      "  html += '<div class=\"detail-top\"><div class=\"detail-icon\">' + p.icon + '</div>';",
-      "  html += '<div class=\"detail-info\"><span class=\"tag\">' + p.vehLabel + ' \\u00B7 ' + p.group + '</span>';",
-      "  html += '<h2>' + p.name + '</h2>';",
-      "  html += '<div class=\"detail-price\">' + fmtRupee(p.price) + '</div>';",
-      "  html += '<div class=\"oem-line\">OEM Reference: <b>' + p.oem + '</b></div></div></div>';",
-      "  html += '<ul class=\"spec-list\">' + p.specs.map(function(s){ return '<li>' + s + '</li>'; }).join('') + '</ul>';",
-      "  html += '<div class=\"fulfill-row\">';",
-      "  html += '<button class=\"btn btn-outline\" id=\"btnPickup\">Pickup from Store</button>';",
-      "  html += '<button class=\"btn btn-fill\" id=\"btnDelivery\">Home Delivery</button>';",
-      "  html += '</div></div>';",
-      "  appArea.innerHTML = html;",
-      "  document.getElementById(\"backToBrowse\").addEventListener(\"click\", renderBrowseHint);",
-      "  document.getElementById(\"btnPickup\").addEventListener(\"click\", renderPickup);",
-      "  document.getElementById(\"btnDelivery\").addEventListener(\"click\", renderDelivery);",
-      "  appArea.scrollIntoView({ behavior: \"smooth\", block: \"start\" });",
-      "}",
-      "",
-      "function renderBrowseHint(){",
-      "  currentProduct = null;",
-      "  appArea.innerHTML = '<div class=\"hint-card\">Choose a category above to browse products.</div>';",
-      "}",
-      "",
-      "function renderPickup(){",
-      "  var p = currentProduct;",
-      "  var html = '';",
-      "  html += '<button class=\"back-link\" id=\"backToDetail\">\\u2190 Back to item</button>';",
-      "  html += '<div class=\"card\">';",
-      "  html += '<div class=\"msg-banner\">Your order is ready to be picked up! The shop owner has approved your reservation.</div>';",
-      "  html += '<div class=\"summary-mini\"><div><b>' + p.name + '</b>' + p.vehLabel + ' \\u00B7 ' + p.group + '</div><div><b>' + fmtRupee(p.price) + '</b>OEM ' + p.oem + '</div></div>';",
-      "  html += '<button class=\"btn btn-fill\" id=\"btnPlaceOrderPickup\" style=\"width:100%\">Place Order</button>';",
-      "  html += '</div>';",
-      "  appArea.innerHTML = html;",
-      "  document.getElementById(\"backToDetail\").addEventListener(\"click\", renderDetail);",
-      "  document.getElementById(\"btnPlaceOrderPickup\").addEventListener(\"click\", function(){",
-      "    var store = STORES[Math.floor(Math.random()*STORES.length)];",
-      "    placeOrder({ mode: \"Pickup from Store\", store: store });",
-      "  });",
-      "}",
-      "",
-      "function renderDelivery(){",
-      "  var p = currentProduct;",
-      "  var html = '';",
-      "  html += '<button class=\"back-link\" id=\"backToDetail\">\\u2190 Back to item</button>';",
-      "  html += '<div class=\"card\">';",
-      "  html += '<div class=\"summary-mini\"><div><b>' + p.name + '</b>' + p.vehLabel + ' \\u00B7 ' + p.group + '</div><div><b>' + fmtRupee(p.price) + '</b>OEM ' + p.oem + '</div></div>';",
-      "  html += '<form id=\"checkoutForm\">';",
-      "  html += '<div class=\"field\"><label>Full Name</label><input type=\"text\" id=\"cf-name\" required placeholder=\"Your full name\"></div>';",
-      "  html += '<div class=\"field\"><label>Delivery Address</label><textarea id=\"cf-address\" required placeholder=\"House no., street, area, city, PIN\"></textarea></div>';",
-      "  html += '<div class=\"field\"><label>Phone Number</label><input type=\"tel\" id=\"cf-phone\" required pattern=\"[0-9+ -]{7,15}\" placeholder=\"+91 98XXX XXXXX\"></div>';",
-      "  html += '<div class=\"field\"><label>Payment Method</label><select id=\"cf-payment\"><option>Cash on Delivery</option><option>UPI</option><option>Credit / Debit Card</option><option>Net Banking</option></select></div>';",
-      "  html += '<button type=\"submit\" class=\"btn btn-fill\" style=\"width:100%\">Place Order</button>';",
-      "  html += '</form></div>';",
-      "  appArea.innerHTML = html;",
-      "  document.getElementById(\"backToDetail\").addEventListener(\"click\", renderDetail);",
-      "  document.getElementById(\"checkoutForm\").addEventListener(\"submit\", function(e){",
-      "    e.preventDefault();",
-      "    var name = document.getElementById(\"cf-name\").value.trim();",
-      "    var address = document.getElementById(\"cf-address\").value.trim();",
-      "    var phone = document.getElementById(\"cf-phone\").value.trim();",
-      "    var payment = document.getElementById(\"cf-payment\").value;",
-      "    if (!name || !address || !phone) return;",
-      "    placeOrder({ mode: \"Home Delivery\", name: name, address: address, phone: phone, payment: payment });",
-      "  });",
-      "}",
-      "",
-      "function placeOrder(fulfillment){",
-      "  appArea.innerHTML = '';",
-      "  startLoading(function(){ renderConfirmation(fulfillment); });",
-      "}",
-      "",
-      "function startLoading(onDone){",
-      "  statusIdx = 0;",
-      "  loadingStatusEl.textContent = STATUS_MESSAGES[0];",
-      "  loadingBar.style.animation = \"none\"; void loadingBar.offsetWidth; loadingBar.style.animation = \"\";",
-      "  overlay.classList.add(\"show\");",
-      "  statusTimer = setInterval(function(){",
-      "    statusIdx = (statusIdx + 1) % STATUS_MESSAGES.length;",
-      "    loadingStatusEl.style.opacity = \"0\";",
-      "    setTimeout(function(){",
-      "      loadingStatusEl.textContent = STATUS_MESSAGES[statusIdx];",
-      "      loadingStatusEl.style.opacity = \"1\";",
-      "    }, 180);",
-      "  }, 1600);",
-      "  setTimeout(function(){",
-      "    clearInterval(statusTimer);",
-      "    overlay.classList.remove(\"show\");",
-      "    onDone();",
-      "  }, 8000);",
-      "}",
-      "",
-      "function randomOrderId(){",
-      "  return \"SF\" + Math.floor(100000 + Math.random()*900000);",
-      "}",
-      "",
-      "function renderConfirmation(fulfillment){",
-      "  var p = currentProduct;",
-      "  var orderId = randomOrderId();",
-      "  var html = '<div class=\"confirm-wrap\">';",
-      "  html += '<div class=\"check-circle\"><svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M4 12.5l5 5L20 6\" stroke=\"#ff6b35\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div>';",
-      "  html += '<h2>Congrats! Your order is placed!</h2>';",
-      "  html += '<p class=\"sub\">Order ID <b style=\"color:#dfe3e6\">' + orderId + '</b> \\u00B7 a confirmation has been logged for ' + p.name + '</p>';",
-      "  html += '<div class=\"order-summary\">';",
-      "  html += '<div><span>Item</span><b>' + p.name + '</b></div>';",
-      "  html += '<div><span>Category</span><b>' + p.vehLabel + ' \\u00B7 ' + p.group + '</b></div>';",
-      "  html += '<div><span>OEM Reference</span><b>' + p.oem + '</b></div>';",
-      "  html += '<div><span>Price</span><b>' + fmtRupee(p.price) + '</b></div>';",
-      "  html += '<div><span>Fulfillment</span><b>' + fulfillment.mode + '</b></div>';",
-      "  if (fulfillment.mode === \"Pickup from Store\") {",
-      "    html += '<div><span>Store</span><b>' + fulfillment.store + '</b></div>';",
-      "  } else {",
-      "    html += '<div><span>Deliver To</span><b>' + fulfillment.name + '</b></div>';",
-      "    html += '<div><span>Address</span><b>' + fulfillment.address + '</b></div>';",
-      "    html += '<div><span>Phone</span><b>' + fulfillment.phone + '</b></div>';",
-      "    html += '<div><span>Payment</span><b>' + fulfillment.payment + '</b></div>';",
-      "  }",
-      "  html += '</div>';",
-      "  html += '<button class=\"btn btn-outline\" id=\"btnContinue\">Continue Shopping</button>';",
-      "  html += '</div>';",
-      "  appArea.innerHTML = html;",
-      "  document.getElementById(\"btnContinue\").addEventListener(\"click\", renderBrowseHint);",
-      "  appArea.scrollIntoView({ behavior: \"smooth\", block: \"start\" });",
-      "  startConfetti();",
-      "}",
-      "",
-      "function startConfetti(){",
-      "  var canvas = document.getElementById(\"confettiCanvas\");",
-      "  var ctx = canvas.getContext(\"2d\");",
-      "  canvas.width = window.innerWidth;",
-      "  canvas.height = window.innerHeight;",
-      "  var colors = [\"#ff6b35\",\"#ffb199\",\"#3b7dd8\",\"#ffffff\",\"#d4501f\"];",
-      "  var particles = [];",
-      "  for (var i=0;i<140;i++){",
-      "    particles.push({",
-      "      x: Math.random()*canvas.width,",
-      "      y: -20 - Math.random()*canvas.height*0.5,",
-      "      w: 6+Math.random()*6, h: 8+Math.random()*10,",
-      "      color: colors[Math.floor(Math.random()*colors.length)],",
-      "      speedY: 2+Math.random()*3, speedX: (Math.random()-0.5)*2,",
-      "      rotation: Math.random()*360, rotSpeed: (Math.random()-0.5)*10",
-      "    });",
-      "  }",
-      "  if (confettiRAF) cancelAnimationFrame(confettiRAF);",
-      "  var start = Date.now(), duration = 3200;",
-      "  function frame(){",
-      "    var elapsed = Date.now() - start;",
-      "    ctx.clearRect(0,0,canvas.width,canvas.height);",
-      "    particles.forEach(function(p){",
-      "      p.y += p.speedY; p.x += p.speedX; p.rotation += p.rotSpeed;",
-      "      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rotation*Math.PI/180);",
-      "      ctx.fillStyle = p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();",
-      "    });",
-      "    if (elapsed < duration) { confettiRAF = requestAnimationFrame(frame); }",
-      "    else { ctx.clearRect(0,0,canvas.width,canvas.height); }",
-      "  }",
-      "  confettiRAF = requestAnimationFrame(frame);",
-      "}",
-      "",
-      "renderDropdowns();",
-      "})();"
-    ].join("\n");
+  function buildProducts(vehType, brandKey, model){
+    var bank = vehType === "car" ? CAR_PARTS : BIKE_PARTS;
+    var brandLabel = CATALOG[vehType].brands[brandKey].label;
+    return bank.map(function(row, i){
+      var seed = (slug(brandKey).length + 1) * 31 + slug(model).length * 7 + i * 13;
+      var rating = (4 + seededRand(seed) * 0.9).toFixed(1);
+      var oem = brandKey.slice(0,3).toUpperCase() + "-" + slug(model).slice(0,4).toUpperCase() + "-" + (1000 + i * 37 + Math.floor(seededRand(seed+1)*90));
+      return {
+        id: slug(vehType) + "-" + slug(brandKey) + "-" + slug(model) + "-" + i,
+        name: row[0],
+        category: row[1],
+        price: row[2],
+        oem: oem,
+        rating: parseFloat(rating),
+        brand: brandLabel,
+        model: model
+      };
+    });
   }
+
+  function starString(rating){
+    var full = Math.round(rating);
+    var s = "";
+    for (var i=0;i<5;i++){ s += i < full ? "\u2605" : "\u2606"; }
+    return s;
+  }
+
+  /* ---------------- state ---------------- */
+  var papp = {
+    step: 1,
+    vehicleType: null,
+    brand: null,
+    model: null,
+    modelSearch: "",
+    products: [],
+    cart: {},          // id -> {product, qty}
+    coupon: null,       // {code, percent}
+    couponMsg: null,
+    customer: {},
+    payment: "Cash on Delivery",
+    orderId: null,
+    otpTimer: null,
+    otpSeconds: 30,
+    otpAttemptError: ""
+  };
+
+  var overlay, body, stepsEl, cartBtn, cartBadge, closeBtn;
+  var otpOverlay, otpInputs, otpTimerEl, otpSpinner, otpError;
+
+  function cartCount(){
+    var n = 0;
+    Object.keys(papp.cart).forEach(function(k){ n += papp.cart[k].qty; });
+    return n;
+  }
+  function cartSubtotal(){
+    var s = 0;
+    Object.keys(papp.cart).forEach(function(k){ s += papp.cart[k].qty * papp.cart[k].product.price; });
+    return s;
+  }
+  function cartDiscount(sub){
+    if (!papp.coupon) return 0;
+    return Math.round(sub * papp.coupon.percent / 100);
+  }
+  function shippingFee(sub){
+    if (sub === 0) return 0;
+    return sub >= 2000 ? 0 : 149;
+  }
+
+  function updateCartBadge(){
+    cartBadge.textContent = String(cartCount());
+  }
+
+  function renderSteps(){
+    var html = "";
+    for (var i=1;i<=7;i++){
+      var cls = "papp-step-dot" + (i === papp.step ? " active" : (i < papp.step ? " done" : ""));
+      html += '<div class="' + cls + '"><span class="n">' + i + '</span><span class="lbl">' + STEP_LABELS[i-1] + '</span></div>';
+      if (i < 7) html += '<div class="papp-step-sep"></div>';
+    }
+    stepsEl.innerHTML = html;
+  }
+
+  function goStep(n){
+    papp.step = n;
+    renderSteps();
+    renderBody();
+    body.scrollTop = 0;
+  }
+
+  function renderBody(){
+    if (papp.step === 1) return renderStep1();
+    if (papp.step === 2) return renderStep2();
+    if (papp.step === 3) return renderStep3();
+    if (papp.step === 4) return renderStep4();
+    if (papp.step === 5) return renderStep5();
+    if (papp.step === 7) return renderStep7();
+  }
+
+  /* ---------------- Step 1: vehicle type + brand ---------------- */
+  function renderStep1(){
+    var html = '<div class="papp-inner">';
+    html += '<div class="papp-head"><h1>Find parts for your vehicle</h1><p>Start by choosing your vehicle type, then pick your brand to see matching spare parts.</p></div>';
+
+    html += '<div class="papp-type-grid">';
+    Object.keys(CATALOG).forEach(function(key){
+      var v = CATALOG[key];
+      var sel = papp.vehicleType === key ? " selected" : "";
+      html += '<div class="papp-type-card' + sel + '" data-veh="' + key + '">' + TYPE_ICONS[key] + '<h3>' + v.label + '</h3><p>' + Object.keys(v.brands).length + ' brands available</p></div>';
+    });
+    html += '</div>';
+
+    if (papp.vehicleType){
+      html += '<div class="papp-section-label">Select a brand</div>';
+      html += '<div class="papp-card-grid" id="papp-brand-grid">';
+      var brands = CATALOG[papp.vehicleType].brands;
+      Object.keys(brands).forEach(function(bk){
+        var b = brands[bk];
+        var sel = papp.brand === bk ? " selected" : "";
+        html += '<div class="papp-brand-card' + sel + '" data-brand="' + bk + '"><div class="bname">' + b.label + '</div><div class="bcount">' + b.models.length + ' models</div></div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="papp-err" id="papp-step1-err">Please select a vehicle type and brand to continue.</div>';
+    html += '<div class="papp-btn-row"><button class="papp-btn papp-btn-primary" id="papp-next1">Next \u2192</button></div>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    body.querySelectorAll(".papp-type-card").forEach(function(card){
+      card.addEventListener("click", function(){
+        papp.vehicleType = card.getAttribute("data-veh");
+        papp.brand = null; papp.model = null;
+        renderStep1();
+      });
+    });
+    body.querySelectorAll(".papp-brand-card").forEach(function(card){
+      card.addEventListener("click", function(){
+        papp.brand = card.getAttribute("data-brand");
+        papp.model = null;
+        renderStep1();
+      });
+    });
+    document.getElementById("papp-next1").addEventListener("click", function(){
+      var err = document.getElementById("papp-step1-err");
+      if (!papp.vehicleType || !papp.brand){ err.classList.add("show"); return; }
+      err.classList.remove("show");
+      goStep(2);
+    });
+  }
+
+  /* ---------------- Step 2: model selection ---------------- */
+  function renderStep2(){
+    var brand = CATALOG[papp.vehicleType].brands[papp.brand];
+    var html = '<div class="papp-inner">';
+    html += '<div class="papp-head"><h1>Choose your ' + brand.label + ' model</h1><p>Pick the exact model so we can match the right OEM parts.</p></div>';
+    html += '<div class="papp-search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input type="text" id="papp-model-search" placeholder="Search models..." value="' + papp.modelSearch.replace(/"/g,"") + '"></div>';
+
+    var models = brand.models.filter(function(m){
+      return m.toLowerCase().indexOf(papp.modelSearch.toLowerCase()) !== -1;
+    });
+
+    if (models.length === 0){
+      html += '<div class="papp-empty">No models match "' + papp.modelSearch + '".</div>';
+    } else {
+      html += '<div class="papp-model-grid">';
+      models.forEach(function(m){
+        var sel = papp.model === m ? " selected" : "";
+        html += '<div class="papp-model-card' + sel + '" data-model="' + m.replace(/"/g,"") + '"><h4>' + m + '</h4><span>' + brand.label + '</span></div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="papp-err" id="papp-step2-err">Please select a model to continue.</div>';
+    html += '<div class="papp-btn-row"><button class="papp-btn papp-btn-ghost" id="papp-back2">\u2190 Back</button><button class="papp-btn papp-btn-primary" id="papp-next2">Next \u2192</button></div>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    var searchInput = document.getElementById("papp-model-search");
+    searchInput.addEventListener("input", function(){
+      papp.modelSearch = searchInput.value;
+      renderStep2();
+      var el = document.getElementById("papp-model-search");
+      el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+    });
+
+    body.querySelectorAll(".papp-model-card").forEach(function(card){
+      card.addEventListener("click", function(){
+        papp.model = card.getAttribute("data-model");
+        renderStep2();
+      });
+    });
+    document.getElementById("papp-back2").addEventListener("click", function(){ goStep(1); });
+    document.getElementById("papp-next2").addEventListener("click", function(){
+      var err = document.getElementById("papp-step2-err");
+      if (!papp.model){ err.classList.add("show"); return; }
+      err.classList.remove("show");
+      papp.products = buildProducts(papp.vehicleType, papp.brand, papp.model);
+      goStep(3);
+    });
+  }
+
+  /* ---------------- Step 3: product catalog ---------------- */
+  function renderStep3(){
+    var html = '<div class="papp-inner">';
+    html += '<div class="papp-head"><h1>Spare parts for ' + CATALOG[papp.vehicleType].brands[papp.brand].label + ' ' + papp.model + '</h1><p>' + papp.products.length + ' matching parts found. Add what you need to your cart.</p></div>';
+
+    html += '<div class="papp-prod-grid">';
+    papp.products.forEach(function(p){
+      var inCart = !!papp.cart[p.id];
+      html += '<div class="papp-prod-card">';
+      html += '<div class="papp-prod-img">' + (PART_ICONS[p.category] || PART_ICONS.accessory) + '</div>';
+      html += '<div class="papp-prod-body">';
+      html += '<div class="papp-prod-title">' + p.name + '</div>';
+      html += '<div class="papp-prod-oem">OEM ' + p.oem + '</div>';
+      html += '<div class="papp-prod-rating"><span class="stars">' + starString(p.rating) + '</span><span>' + p.rating + '</span></div>';
+      html += '<div class="papp-prod-price">' + fmtRupee(p.price) + '<sup> / unit</sup></div>';
+      html += '<button class="papp-add-btn' + (inCart ? ' in-cart' : '') + '" data-id="' + p.id + '">' + (inCart ? ('In cart \u00B7 ' + papp.cart[p.id].qty) : 'Add to Cart') + '</button>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+
+    html += '<div class="papp-btn-row"><button class="papp-btn papp-btn-ghost" id="papp-back3">\u2190 Back</button><button class="papp-btn papp-btn-primary" id="papp-next3">Go to Cart \u2192</button></div>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    body.querySelectorAll(".papp-add-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-id");
+        var product = papp.products.filter(function(p){ return p.id === id; })[0];
+        if (papp.cart[id]) papp.cart[id].qty += 1;
+        else papp.cart[id] = { product: product, qty: 1 };
+        updateCartBadge();
+        btn.classList.add("in-cart");
+        btn.textContent = "In cart \u00B7 " + papp.cart[id].qty;
+      });
+    });
+    document.getElementById("papp-back3").addEventListener("click", function(){ goStep(2); });
+    document.getElementById("papp-next3").addEventListener("click", function(){ goStep(4); });
+  }
+
+  /* ---------------- Step 4: cart & discount ---------------- */
+  function renderStep4(){
+    var ids = Object.keys(papp.cart);
+    var html = '<div class="papp-inner">';
+    html += '<div class="papp-head"><h1>Your cart</h1><p>Review quantities and apply a discount coupon before checkout.</p></div>';
+
+    if (ids.length === 0){
+      html += '<div class="papp-empty">Your cart is empty. Go back to the catalog to add parts.</div>';
+      html += '<div class="papp-btn-row"><button class="papp-btn papp-btn-ghost" id="papp-back4">\u2190 Back to catalog</button></div>';
+      html += '</div>';
+      body.innerHTML = html;
+      document.getElementById("papp-back4").addEventListener("click", function(){ goStep(3); });
+      return;
+    }
+
+    html += '<div class="papp-cart-list">';
+    ids.forEach(function(id){
+      var row = papp.cart[id];
+      var p = row.product;
+      html += '<div class="papp-cart-row" data-id="' + id + '">';
+      html += '<div class="papp-cart-img">' + (PART_ICONS[p.category] || PART_ICONS.accessory) + '</div>';
+      html += '<div class="papp-cart-info"><div class="t">' + p.name + '</div><div class="o">OEM ' + p.oem + ' \u00B7 ' + fmtRupee(p.price) + '</div></div>';
+      html += '<div class="papp-qty"><button class="papp-qty-dec" data-id="' + id + '">\u2212</button><span class="q">' + row.qty + '</span><button class="papp-qty-inc" data-id="' + id + '">+</button></div>';
+      html += '<div class="papp-cart-sub">' + fmtRupee(row.qty * p.price) + '</div>';
+      html += '<button class="papp-cart-remove" data-id="' + id + '" title="Remove"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="papp-section-label">Discount coupon</div>';
+    html += '<div class="papp-coupon-row"><input type="text" id="papp-coupon-input" placeholder="Enter code e.g. SPARE10" value="' + (papp.coupon ? papp.coupon.code : "") + '"><button class="papp-btn papp-btn-outline" id="papp-coupon-apply">Apply</button></div>';
+    if (papp.couponMsg){
+      html += '<div class="papp-coupon-msg ' + papp.couponMsg.type + '">' + papp.couponMsg.text + '</div>';
+    }
+
+    var sub = cartSubtotal();
+    var disc = cartDiscount(sub);
+    var ship = shippingFee(sub - disc);
+    var total = sub - disc + ship;
+
+    html += '<div class="papp-summary" style="margin-top:26px;">';
+    html += '<div class="papp-summary-row"><span>Subtotal</span><b>' + fmtRupee(sub) + '</b></div>';
+    html += '<div class="papp-summary-row discount"><span>Discount' + (papp.coupon ? ' (' + papp.coupon.code + ')' : '') + '</span><b>' + (disc > 0 ? '\u2212' + fmtRupee(disc) : fmtRupee(0)) + '</b></div>';
+    html += '<div class="papp-summary-row"><span>Shipping</span><b>' + (ship === 0 ? 'FREE' : fmtRupee(ship)) + '</b></div>';
+    html += '<div class="papp-summary-row total"><span>Grand Total</span><b>' + fmtRupee(total) + '</b></div>';
+    html += '</div>';
+
+    html += '<div class="papp-btn-row"><button class="papp-btn papp-btn-ghost" id="papp-back4">\u2190 Back to catalog</button><button class="papp-btn papp-btn-primary" id="papp-next4">Proceed to Checkout \u2192</button></div>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    body.querySelectorAll(".papp-qty-inc").forEach(function(b){
+      b.addEventListener("click", function(){ papp.cart[b.getAttribute("data-id")].qty += 1; renderStep4(); updateCartBadge(); });
+    });
+    body.querySelectorAll(".papp-qty-dec").forEach(function(b){
+      b.addEventListener("click", function(){
+        var id = b.getAttribute("data-id");
+        papp.cart[id].qty -= 1;
+        if (papp.cart[id].qty <= 0) delete papp.cart[id];
+        renderStep4(); updateCartBadge();
+      });
+    });
+    body.querySelectorAll(".papp-cart-remove").forEach(function(b){
+      b.addEventListener("click", function(){ delete papp.cart[b.getAttribute("data-id")]; renderStep4(); updateCartBadge(); });
+    });
+    document.getElementById("papp-coupon-apply").addEventListener("click", function(){
+      var code = document.getElementById("papp-coupon-input").value.trim().toUpperCase();
+      if (code === "SPARE10"){
+        papp.coupon = { code: "SPARE10", percent: 10 };
+        papp.couponMsg = { type: "ok", text: "SPARE10 applied \u2014 10% off your order!" };
+      } else if (code.length === 0){
+        papp.coupon = null;
+        papp.couponMsg = null;
+      } else {
+        papp.coupon = null;
+        papp.couponMsg = { type: "bad", text: "\"" + code + "\" is not a valid coupon code." };
+      }
+      renderStep4();
+    });
+    document.getElementById("papp-back4").addEventListener("click", function(){ goStep(3); });
+    document.getElementById("papp-next4").addEventListener("click", function(){ goStep(5); });
+  }
+
+  /* ---------------- Step 5: checkout form ---------------- */
+  function renderStep5(){
+    var sub = cartSubtotal();
+    var disc = cartDiscount(sub);
+    var ship = shippingFee(sub - disc);
+    var total = sub - disc + ship;
+
+    var html = '<div class="papp-inner">';
+    html += '<div class="papp-head"><h1>Delivery & payment</h1><p>Tell us where to send your order.</p></div>';
+    html += '<form class="papp-form" id="papp-checkout-form">';
+    html += '<div class="papp-field"><label>Full Name</label><input type="text" id="papp-cf-name" required placeholder="Your full name" value="' + (papp.customer.name||"") + '"></div>';
+    html += '<div class="papp-field"><label>Delivery Address</label><textarea id="papp-cf-address" required placeholder="House no., street, area, city, PIN">' + (papp.customer.address||"") + '</textarea></div>';
+    html += '<div class="papp-field"><label>Phone Number</label><input type="tel" id="papp-cf-phone" required pattern="[0-9+ -]{7,15}" placeholder="+91 98XXX XXXXX" value="' + (papp.customer.phone||"") + '"></div>';
+    html += '<div class="papp-field"><label>Payment Method</label><div class="papp-pay-methods">';
+    ["Cash on Delivery","UPI","Credit / Debit Card","Net Banking"].forEach(function(m){
+      var sel = papp.payment === m ? " selected" : "";
+      html += '<label class="papp-pay-opt' + sel + '" data-pay="' + m + '"><input type="radio" name="papp-pay" value="' + m + '"' + (papp.payment === m ? " checked" : "") + '>' + m + '</label>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="papp-summary" style="margin-left:0;max-width:none;margin-bottom:22px;">';
+    html += '<div class="papp-summary-row"><span>Subtotal</span><b>' + fmtRupee(sub) + '</b></div>';
+    html += '<div class="papp-summary-row discount"><span>Discount</span><b>' + (disc>0?'\u2212'+fmtRupee(disc):fmtRupee(0)) + '</b></div>';
+    html += '<div class="papp-summary-row"><span>Shipping</span><b>' + (ship===0?'FREE':fmtRupee(ship)) + '</b></div>';
+    html += '<div class="papp-summary-row total"><span>Grand Total</span><b>' + fmtRupee(total) + '</b></div>';
+    html += '</div>';
+
+    html += '<div class="papp-btn-row"><button type="button" class="papp-btn papp-btn-ghost" id="papp-back5">\u2190 Back to cart</button><button type="submit" class="papp-btn papp-btn-primary">Pay & Request OTP</button></div>';
+    html += '</form></div>';
+    body.innerHTML = html;
+
+    body.querySelectorAll(".papp-pay-opt").forEach(function(opt){
+      opt.addEventListener("click", function(){
+        papp.payment = opt.getAttribute("data-pay");
+        body.querySelectorAll(".papp-pay-opt").forEach(function(o){ o.classList.remove("selected"); });
+        opt.classList.add("selected");
+        opt.querySelector("input").checked = true;
+      });
+    });
+    document.getElementById("papp-back5").addEventListener("click", function(){ goStep(4); });
+    document.getElementById("papp-checkout-form").addEventListener("submit", function(e){
+      e.preventDefault();
+      papp.customer = {
+        name: document.getElementById("papp-cf-name").value.trim(),
+        address: document.getElementById("papp-cf-address").value.trim(),
+        phone: document.getElementById("papp-cf-phone").value.trim()
+      };
+      if (!papp.customer.name || !papp.customer.address || !papp.customer.phone) return;
+      openOtpModal();
+    });
+  }
+
+  /* ---------------- Step 6: OTP verification (modal, not a step page) ---------------- */
+  function openOtpModal(){
+    papp.otpAttemptError = "";
+    otpOverlay.classList.add("show");
+    otpInputs.forEach(function(inp){ inp.value = ""; });
+    otpError.textContent = "";
+    otpSpinner.classList.remove("show");
+    otpInputs[0].focus();
+    startOtpCountdown();
+  }
+
+  function startOtpCountdown(){
+    papp.otpSeconds = 30;
+    updateOtpTimerText();
+    if (papp.otpTimer) clearInterval(papp.otpTimer);
+    papp.otpTimer = setInterval(function(){
+      papp.otpSeconds -= 1;
+      if (papp.otpSeconds <= 0){
+        clearInterval(papp.otpTimer);
+        otpTimerEl.textContent = "OTP expired \u2014 request a new one";
+      } else {
+        updateOtpTimerText();
+      }
+    }, 1000);
+  }
+  function updateOtpTimerText(){
+    var s = papp.otpSeconds;
+    var mm = String(Math.floor(s/60)).padStart(2,"0");
+    var ss = String(s%60).padStart(2,"0");
+    otpTimerEl.textContent = "Resend in " + mm + ":" + ss;
+  }
+
+  function checkOtp(){
+    var code = otpInputs.map(function(i){ return i.value; }).join("");
+    if (code.length < 4) return;
+    otpSpinner.classList.add("show");
+    otpError.textContent = "";
+    setTimeout(function(){
+      otpSpinner.classList.remove("show");
+      if (code === "1234"){
+        if (papp.otpTimer) clearInterval(papp.otpTimer);
+        otpOverlay.classList.remove("show");
+        papp.orderId = "SF" + Math.floor(100000 + Math.random()*900000);
+        goStep(7);
+      } else {
+        otpError.textContent = "Incorrect OTP. Please try again.";
+        otpInputs.forEach(function(inp){ inp.value = ""; });
+        otpInputs[0].focus();
+      }
+    }, 900);
+  }
+
+  function wireOtpInputs(){
+    otpInputs.forEach(function(inp, idx){
+      inp.addEventListener("input", function(){
+        inp.value = inp.value.replace(/[^0-9]/g,"").slice(0,1);
+        if (inp.value && idx < 3) otpInputs[idx+1].focus();
+        var all = otpInputs.map(function(i){ return i.value; }).join("");
+        if (all.length === 4) checkOtp();
+      });
+      inp.addEventListener("keydown", function(e){
+        if (e.key === "Backspace" && !inp.value && idx > 0) otpInputs[idx-1].focus();
+      });
+    });
+  }
+
+  /* ---------------- Step 7: order success + confetti ---------------- */
+  function renderStep7(){
+    var sub = cartSubtotal();
+    var disc = cartDiscount(sub);
+    var ship = shippingFee(sub - disc);
+    var total = sub - disc + ship;
+    var itemCount = cartCount();
+
+    var html = '<div class="papp-inner"><div class="papp-success">';
+    html += '<div class="papp-check"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#ff6b35" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+    html += '<h2>Order Placed Successfully!</h2>';
+    html += '<div class="oid">Order ID <b>' + papp.orderId + '</b></div>';
+    html += '<div class="papp-track">';
+    html += '<div class="papp-track-row"><span>Vehicle</span><b>' + CATALOG[papp.vehicleType].brands[papp.brand].label + ' ' + papp.model + '</b></div>';
+    html += '<div class="papp-track-row"><span>Items</span><b>' + itemCount + ' part' + (itemCount===1?"":"s") + '</b></div>';
+    html += '<div class="papp-track-row"><span>Deliver To</span><b>' + papp.customer.name + '</b></div>';
+    html += '<div class="papp-track-row"><span>Address</span><b>' + papp.customer.address + '</b></div>';
+    html += '<div class="papp-track-row"><span>Payment</span><b>' + papp.payment + '</b></div>';
+    html += '<div class="papp-track-row"><span>Grand Total</span><b>' + fmtRupee(total) + '</b></div>';
+    html += '<div class="papp-track-row"><span>Estimated Delivery</span><b>3\u20135 business days</b></div>';
+    html += '</div>';
+    html += '<button class="papp-btn papp-btn-primary" id="papp-continue-shopping">Continue Shopping</button>';
+    html += '</div></div>';
+    body.innerHTML = html;
+
+    document.getElementById("papp-continue-shopping").addEventListener("click", function(){
+      papp.vehicleType = null; papp.brand = null; papp.model = null; papp.modelSearch = "";
+      papp.products = []; papp.cart = {}; papp.coupon = null; papp.couponMsg = null;
+      papp.customer = {}; papp.payment = "Cash on Delivery"; papp.orderId = null;
+      updateCartBadge();
+      goStep(1);
+    });
+
+    fireConfetti();
+  }
+
+  /* ---------------- confetti ---------------- */
+  function fireConfetti(){
+    if (window.confetti){
+      window.confetti({ particleCount: 140, spread: 80, origin: { y: 0.5 }, colors: ["#ff6b35","#ffb199","#3b7dd8","#ffffff","#d4501f"] });
+      setTimeout(function(){
+        window.confetti({ particleCount: 90, angle: 60, spread: 65, origin: { x: 0 }, colors: ["#ff6b35","#3b7dd8","#ffffff"] });
+        window.confetti({ particleCount: 90, angle: 120, spread: 65, origin: { x: 1 }, colors: ["#ff6b35","#3b7dd8","#ffffff"] });
+      }, 250);
+      return;
+    }
+    // fallback custom canvas particle burst if canvas-confetti hasn't loaded
+    var canvas = document.getElementById("papp-confetti-canvas");
+    var ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    var colors = ["#ff6b35","#ffb199","#3b7dd8","#ffffff","#d4501f"];
+    var particles = [];
+    for (var i=0;i<140;i++){
+      particles.push({
+        x: Math.random()*canvas.width, y: -20 - Math.random()*canvas.height*0.5,
+        w: 6+Math.random()*6, h: 8+Math.random()*10,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        speedY: 2+Math.random()*3, speedX: (Math.random()-0.5)*2,
+        rotation: Math.random()*360, rotSpeed: (Math.random()-0.5)*10
+      });
+    }
+    var start = Date.now(), duration = 3200;
+    function frame(){
+      var elapsed = Date.now() - start;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      particles.forEach(function(p){
+        p.y += p.speedY; p.x += p.speedX; p.rotation += p.rotSpeed;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rotation*Math.PI/180);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();
+      });
+      if (elapsed < duration) requestAnimationFrame(frame);
+      else ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------- open / close app ---------------- */
+  function openApp(){
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    goStep(1);
+    updateCartBadge();
+  }
+  function closeApp(){
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  /* ---------------- init ---------------- */
+  function init(){
+    overlay = document.getElementById("papp-overlay");
+    body = document.getElementById("papp-body");
+    stepsEl = document.getElementById("papp-steps");
+    cartBtn = document.getElementById("papp-cart-btn");
+    cartBadge = document.getElementById("papp-cart-badge");
+    closeBtn = document.getElementById("papp-close-btn");
+    otpOverlay = document.getElementById("papp-otp-overlay");
+    otpInputs = Array.prototype.slice.call(document.querySelectorAll(".papp-otp-input"));
+    otpTimerEl = document.getElementById("papp-otp-timer");
+    otpSpinner = document.getElementById("papp-otp-spinner");
+    otpError = document.getElementById("papp-otp-error");
+
+    if (!overlay) return;
+    wireOtpInputs();
+
+    var link = document.getElementById("productsNavLink");
+    if (link) link.addEventListener("click", function(e){ e.preventDefault(); openApp(); });
+
+    closeBtn.addEventListener("click", closeApp);
+    cartBtn.addEventListener("click", function(){
+      if (papp.step >= 3) goStep(4);
+    });
+
+    document.addEventListener("keydown", function(e){
+      if (e.key === "Escape" && overlay.classList.contains("show") && !otpOverlay.classList.contains("show")) closeApp();
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+
 })();
 </script>
 
