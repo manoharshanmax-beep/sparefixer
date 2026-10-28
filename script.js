@@ -2090,7 +2090,7 @@ function initCursorAndMagnetic() {
 /* ============================== ROUTER ============================== */
 let activePage = 'home';
 function currentPage() { return activePage; }
-function showPage(name) { qsa('.page').forEach(p => { p.hidden = p.dataset.page !== name; }); activePage = name; }
+function showPage(name) { if (activePage === 'live-map' && name !== 'live-map') window.SparefixerLiveMap?.leave(); qsa('.page').forEach(p => { p.hidden = p.dataset.page !== name; }); activePage = name; }
 function navigate(hash) {
   if (location.hash === hash) router(); else location.hash = hash;
 }
@@ -2105,6 +2105,7 @@ function router() {
     shop: () => { showPage('shop'); renderShopFull(); },
     sellers: () => { showPage('sellers'); renderSellersPage(); },
     seller: () => { showPage('seller-profile'); renderSellerProfile(param); },
+    'live-map': () => { showPage('live-map'); window.SparefixerLiveMap?.enter(); },
     workshops: () => { showPage('workshops'); renderWorkshopsPage(); },
     blog: () => { param ? (showPage('blog-article'), renderArticlePage(param)) : (showPage('blog'), renderBlogListPage()); },
     about: () => showPage('about'),

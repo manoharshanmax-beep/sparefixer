@@ -9,7 +9,8 @@
 <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css?v=nearby-search-4">
 </head>
 <body>
 <a href="#main" class="skip-link">Skip to content</a>
@@ -147,6 +148,7 @@
     <nav class="nav-links" aria-label="Primary">
       <a href="#/shop" data-nav>Shop</a>
       <a href="#/sellers" data-nav>Sellers</a>
+      <a href="#/live-map" data-nav>Live map</a>
       <a href="#/workshops" data-nav>Workshops</a>
       <a href="#/blog" data-nav>Garage Blog</a>
       <a href="#/sell" data-nav>Sell on SpareFixer</a>
@@ -195,6 +197,7 @@
       </button>
     </div>
     <a href="#/" data-nav data-close-mobilenav>Home</a>
+    <a href="#/live-map" data-nav data-close-mobilenav>Live map / Nearby shops</a>
     <a href="#/shop" data-nav data-close-mobilenav>Shop parts</a>
     <a href="#/wishlist" data-nav data-close-mobilenav>Wishlist</a>
     <a href="#/sellers" data-nav data-close-mobilenav>Sellers</a>
@@ -604,7 +607,7 @@
     <div class="container">
       <span class="eyebrow">Service network</span>
       <h1 class="h2">Book a workshop near you</h1>
-      <p class="lede">Five partner workshops with published pricing, real service lists and pickup options where available.</p>
+      <p class="lede">Illustrative workshop cards. For real mapped local businesses, open the <a href="#/live-map" data-nav>live map and nearby search</a>.</p>
     </div>
   </div>
   <section class="tight" style="padding-top:0">
@@ -1012,6 +1015,63 @@
   </div>
 </section>
 
+
+<!-- Real location and OSM listings: independent of the demo catalogue. -->
+<section class="page" data-page="live-map" hidden>
+  <div class="page-hero"><div class="container">
+    <span class="eyebrow">On the road · SpareFixer</span>
+    <h1 class="h2">Your location. Your local garage.</h1>
+    <p class="lede">Find mapped mechanics, workshops, vehicle showrooms and parts shops within 5 or 10 km of your location.</p>
+  </div></div>
+  <div class="container gps-layout">
+    <div class="gps-main">
+      <div class="gps-toolbar">
+        <button type="button" class="btn btn-primary" id="gpsEnable">Enable Live Location</button>
+        <button type="button" class="btn btn-secondary" id="gpsStop" disabled>Stop tracking</button>
+        <button type="button" class="btn btn-secondary" id="gpsFollow" aria-pressed="true" disabled>Following you</button>
+      </div>
+      <div class="gps-search-box">
+        <form id="mapSearchForm" role="search">
+          <label for="mapSearchQuery">Search mechanics, workshops or showrooms</label>
+          <div class="gps-search-row"><input id="mapSearchQuery" type="search" maxlength="200" placeholder="e.g. bike repair in your town" autocomplete="off"><button type="submit" class="btn btn-primary">Search Google Maps ↗</button></div>
+        </form>
+        <div class="gps-search-row"><button type="button" id="gpsSearchArea" class="btn btn-secondary">Search this area</button><span class="small">Search vehicle-service pins within your selected 5 or 10 km radius of the map centre.</span></div>
+        <p class="small">Type a business or town to search Google Maps in a new tab. Leave the field blank to search near the map location. Google Maps sets its own search area.</p>
+        <p id="mapSearchStatus" class="gps-map-search-status" role="status" aria-live="polite">Pan or zoom the map, then press Search this area.</p>
+      </div>
+      <p id="gpsStatus" class="gps-status" role="status" aria-live="polite" data-state="idle">Location is off. Enable it when you are ready.</p>
+      <div class="gps-map-wrap">
+        <div id="liveMap" role="region" aria-label="Interactive live location map" tabindex="0"></div>
+        <button type="button" id="gpsRecenter" class="gps-recenter" aria-label="Recenter map on my location" title="Recenter on my location" disabled><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg></button>
+      </div>
+      <p id="gpsResultCount" class="gps-result-count" role="status">No shop results loaded</p>
+      <p class="small">Look for coloured M, S and P pins. Hospital and other labels are part of the background map, not your search results.</p>
+      <button type="button" class="btn btn-secondary" id="gpsShowAll" disabled>Show all shop pins</button>
+      <p id="tileStatus" class="small" role="status"></p>
+      <dl class="gps-stats">
+        <div><dt>Coordinates</dt><dd id="gpsCoords">—</dd></div>
+        <div><dt>Reported accuracy</dt><dd id="gpsAccuracy">—</dd></div>
+        <div><dt>Last successful fix</dt><dd><time id="gpsUpdated">—</time></dd></div>
+      </dl>
+      <p class="small gps-note">The blue circle shows reported uncertainty. Location may use GPS, Wi-Fi or mobile networks. Accuracy and update frequency depend on your device; indoor and desktop fixes may be approximate. Drag the map to explore, or tap the GPS button to follow again.</p>
+    </div>
+    <aside id="gpsNearbyPanel" class="gps-sidebar" aria-label="Nearby vehicle services">
+      <h2 class="h3">Nearby vehicle services</h2>
+      <label class="gps-radius-label" for="gpsRadius">Search radius</label>
+      <select id="gpsRadius"><option value="5000">5 km</option><option value="10000" selected>10 km</option></select>
+      <p class="gps-legend"><span class="gps-key mechanic">M · Mechanic / workshop</span><span class="gps-key showroom">S · Showroom</span><span class="gps-key parts">P · Parts &amp; tyres</span></p>
+      <label class="gps-consent"><input type="checkbox" id="gpsNearby" checked> Automatically find nearby vehicle services</label>
+      <p class="small">When you open this page and allow location, nearby search sends your approximate area to the shop search service. Map tiles reveal the viewed area to OpenStreetMap. SpareFixer keeps your GPS location only in this page’s memory. Turn automatic search off to stop shop requests.</p>
+      <button type="button" class="btn btn-secondary" id="gpsSearch" disabled>Refresh nearby shops</button>
+      <p id="nearbyStatus" class="small gps-search-status" role="status" aria-live="polite">Waiting for location to find nearby vehicle services…</p>
+      <details class="gps-more"><summary>Missing a shop? Search another directory</summary><p class="small">These buttons open Google Maps separately using your approximate location. They do not add Google listings to this map or enforce the radius selected above.</p><button type="button" class="btn btn-secondary" id="gpsMoreMechanics" disabled>Find mechanics on Google Maps</button><button type="button" class="btn btn-secondary" id="gpsMoreShowrooms" disabled>Find showrooms on Google Maps</button></details>
+      <ul id="nearbyList" class="gps-shop-list"></ul>
+      <p class="small">Listings can be incomplete or outdated; check details before travelling. Distances are geographical, not driving routes. No shop availability or stock is assumed.</p>
+    </aside>
+  </div>
+  <div class="container"><p class="small gps-note">Tracking runs while this map is open. Leaving this page or pressing Stop clears your position and ends tracking. Browsers may pause updates when the screen locks or the tab is in the background.</p></div>
+</section>
+
 </main>
 
 <!-- ============================== FOOTER ============================== -->
@@ -1351,6 +1411,8 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="live-location.js?v=nearby-search-4" defer></script>
 <script src="script.js" defer></script>
 </body>
 </html>

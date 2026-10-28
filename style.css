@@ -839,3 +839,53 @@ noscript.ns-banner{display:block;background:var(--warn);color:#241a02;padding:12
 .car .spin{animation:carSpin 7s linear infinite}
 @keyframes carSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){ .car .spin{animation:none} .car .body-line.draw{stroke-dashoffset:0;animation:none} }
+
+/* Live location: scoped to avoid altering the marketplace design. */
+.gps-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;padding-bottom:24px}
+.gps-main,.gps-sidebar{min-width:0;background:var(--bg-1);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:20px}
+.gps-toolbar{display:flex;flex-wrap:wrap;gap:10px}
+.gps-status{padding:14px 0;font-size:.9rem;color:var(--ink-dim);min-height:52px}
+.gps-status[data-state="live"]{color:var(--good)}
+.gps-status[data-state="error"]{color:var(--bad)}
+.gps-map-wrap{position:relative;isolation:isolate;border-radius:12px;overflow:hidden;border:1px solid var(--line-2)}
+#liveMap{width:100%;height:clamp(340px,58vh,640px);background:#dde4e8;color:#162638;z-index:0;color-scheme:light}
+#liveMap img{max-width:none}
+#liveMap .leaflet-control a{color:#162638}
+#liveMap .leaflet-popup-content{line-height:1.5}
+#liveMap .leaflet-popup-content-wrapper{background:white;color:#162638}
+#liveMap .leaflet-control-attribution{font-size:11px;background:rgba(255,255,255,.9);color:#263341}
+.gps-recenter{position:absolute;right:12px;bottom:38px;z-index:5;background:#fff;color:#2274df;border-radius:50%;width:48px;height:48px;display:grid;place-items:center;box-shadow:0 3px 16px #0003;border:1px solid #c4d4e8}
+.gps-layout button:disabled{opacity:.5;cursor:not-allowed}
+.gps-toolbar [aria-pressed="true"]{border-color:#428df7;color:#428df7}
+.gps-user{background:none;border:0;display:grid;place-items:center}
+.gps-dot{display:block;width:18px;height:18px;border:3px solid white;border-radius:50%;background:#247af0;box-shadow:0 1px 7px #1238;position:relative}
+.gps-dot::after{content:'';position:absolute;inset:-9px;border:2px solid #247af077;border-radius:50%;animation:gps-pulse 2.5s ease-out infinite}
+.gps-stale .gps-dot::after{animation:none;opacity:.3}
+@keyframes gps-pulse{0%{transform:scale(.65);opacity:.8}100%{transform:scale(1.7);opacity:0}}
+.gps-shop-marker{display:grid!important;place-items:center;border-radius:50%;background:#f15c23;border:2px solid white;color:white;font-weight:800;box-shadow:0 2px 6px #0005;font-size:13px}
+.gps-stats{display:grid;grid-template-columns:1.3fr .8fr 1fr;gap:12px;padding:16px 0;margin:0;border-bottom:1px solid var(--line)}
+.gps-stats dt{font-size:.72rem;color:var(--ink-dim);margin-bottom:5px}
+.gps-stats dd{margin:0;font-size:.82rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.gps-sidebar{display:flex;flex-direction:column;gap:16px;align-self:start}
+.gps-consent{display:flex;gap:10px;align-items:flex-start;font-size:.9rem;cursor:pointer}
+.gps-consent input{width:20px;height:20px;flex-shrink:0;accent-color:var(--accent)}
+.gps-shop-list{max-height:500px;overflow:auto;overscroll-behavior:contain;display:grid;gap:12px}
+.gps-shop-list li{padding:14px;border:1px solid var(--line-2);border-radius:10px;display:grid;gap:12px}
+.gps-shop-detail strong{display:block;font-size:.95rem}
+.gps-shop-detail p{font-size:.8rem;margin-top:5px;overflow-wrap:anywhere}
+.gps-shop-detail a{display:block;color:#2879ee;text-decoration:underline;font-size:.8rem;margin-top:8px}
+.gps-note{padding:16px 0 24px}
+@media(max-width:1000px){.gps-layout{grid-template-columns:1fr}.gps-shop-list{max-height:420px}}
+@media(max-width:560px){.gps-main,.gps-sidebar{padding:12px}.gps-stats{grid-template-columns:1fr 1fr}.gps-stats>div:last-child{grid-column:1/-1}.gps-toolbar .btn{flex:1;font-size:.8rem;padding:10px}#liveMap{height:54vh;min-height:340px}}
+@media(prefers-reduced-motion:reduce){.gps-dot::after{animation:none}}
+
+/* Nearby services integration: keep results in the sidebar, outside the map. */
+#gpsRadius{width:100%;padding:12px;border:1px solid var(--line-2);border-radius:9px;background:var(--bg-1);color:var(--ink);font:inherit}
+.gps-radius-label{font-weight:700}.gps-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.75rem}.gps-key{padding:5px 8px;border-radius:7px;color:white}.gps-key.mechanic{background:#c74716}.gps-key.showroom{background:#7543c7}.gps-key.parts{background:#087b72}
+.gps-shop-marker.gps-showroom{background:#7543c7}.gps-shop-marker.gps-parts{background:#087b72}
+.gps-result-count{font-weight:800;padding:12px 0 4px}.gps-search-status{padding:12px;border:1px solid var(--line-2);border-radius:9px}.gps-more summary{cursor:pointer;font-weight:700}.gps-more .btn{width:100%;margin-top:10px;white-space:normal}.gps-more p{margin-top:10px}.gps-shop-list{list-style:none;padding:0}
+
+/* Keep search visible above the map on desktop and mobile. */
+.gps-search-box{margin:18px 0;padding:16px;border:1px solid var(--line-2);border-radius:12px;background:var(--bg-1)}
+.gps-search-box label{display:block;font-weight:700;margin-bottom:10px}.gps-search-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.gps-search-row input{min-width:180px;flex:1;padding:13px;border:1px solid var(--line-2);border-radius:8px;color:var(--ink);background:var(--bg-1);font:inherit}.gps-search-row .small{flex:1;min-width:200px}.gps-map-search-status{margin-top:10px;font-size:.85rem;overflow-wrap:anywhere}.gps-search-box .btn{white-space:normal}
+@media(max-width:560px){.gps-search-row input,.gps-search-row .btn{width:100%;flex:auto}.gps-search-box{padding:12px}}
