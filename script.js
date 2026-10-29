@@ -18,7 +18,7 @@ const DATA = {
   brand: {
     name: 'SpareFixer',
     tagline: 'Find the Right Part. Fix It Right.',
-    whatsapp: '919876543210',
+    whatsapp: '919626750414',
     phone: '+91 98765 43210',
     email: 'help@sparefixer.example'
   },
